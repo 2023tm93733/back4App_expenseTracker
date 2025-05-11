@@ -38,6 +38,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: 'ExpensePro',
     theme: ThemeData(
+      primaryColor: Colors.deepPurple,
       primarySwatch: Colors.deepPurple,
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
