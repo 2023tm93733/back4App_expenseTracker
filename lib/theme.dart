@@ -15,7 +15,7 @@ class AppTheme {
   /// - Input decoration with rounded borders
   static ThemeData get light {
     return ThemeData(
-      primarySwatch: Colors.indigo,
+      primarySwatch: Colors.deepPurple,
       secondaryHeaderColor: Colors.teal,
       scaffoldBackgroundColor: Colors.grey[100],
       textTheme: const TextTheme(
