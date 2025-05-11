@@ -89,10 +89,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextFormField(
                           controller: _usernameCtrl,
                           decoration: const InputDecoration(
-                            labelText: 'Username',
+                            labelText: 'Email Address/Username',
                           ),
                           validator:
-                              (v) => v!.isEmpty ? 'Enter username' : null,
+                              (v) => v!.isEmpty ? 'Enter Email Address/Username' : null,
                         ),
                         const SizedBox(height: 12),
                         TextFormField(

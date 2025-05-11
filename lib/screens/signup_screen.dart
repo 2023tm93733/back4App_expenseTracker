@@ -33,6 +33,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   /// Controller for the password input field.
   final _passwordCtrl = TextEditingController();
+  final _confirmPasswordCtrl = TextEditingController();
 
   /// Whether the signup process is in progress.
   bool _loading = false;
@@ -70,6 +71,7 @@ class _SignupScreenState extends State<SignupScreen> {
     _usernameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
     super.dispose();
   }
 
@@ -100,28 +102,28 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
-                          controller: _usernameCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Username',
-                          ),
-                          validator:
-                              (v) =>
-                                  v != null && v.isNotEmpty
-                                      ? null
-                                      : 'Enter username',
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
                           controller: _emailCtrl,
                           decoration: const InputDecoration(
                             labelText: 'Email Address',
                           ),
                           keyboardType: TextInputType.emailAddress,
+                          onChanged: (value) {
+                            final username = value.split('@').first;
+                            _usernameCtrl.text = username;
+                          },
                           validator:
                               (v) =>
                                   v != null && v.contains('@')
                                       ? null
                                       : 'Enter valid email',
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _usernameCtrl,
+                          readOnly: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Username (auto-generated)',
+                          ),
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
@@ -135,6 +137,19 @@ class _SignupScreenState extends State<SignupScreen> {
                                   v != null && v.length >= 6
                                       ? null
                                       : 'Min 6 characters',
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _confirmPasswordCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Confirm Password',
+                          ),
+                          obscureText: true,
+                          validator:
+                              (v) =>
+                                  v == _passwordCtrl.text
+                                      ? null
+                                      : 'Passwords do not match',
                         ),
                         if (_error != null) ...[
                           const SizedBox(height: 12),

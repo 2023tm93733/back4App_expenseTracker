@@ -29,22 +29,49 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Service for interacting with the backend (Back4App).
   final _service = Back4AppService();
 
-  /// Future holding the list of expenses to be displayed.
-  late Future<List<Expense>> _future;
+  List<Expense> _allExpenses = [];
+  List<Expense> _filteredExpenses = [];
+
+  late Future<void> _futureLoad;
+
+  final List<String> _categories = [
+    'All',
+    'Home',
+    'Travel',
+    'Misc',
+    'Food',
+    'Utilities',
+    'Entertainment',
+  ];
+  String _selectedCategory = 'All';
+
+  double get _totalAmount =>
+      _filteredExpenses.fold(0.0, (sum, e) => sum + e.amount);
 
   @override
   void initState() {
     super.initState();
-    _loadExpenses();
+    _futureLoad = _loadExpenses();
   }
 
-  /// Loads the list of expenses from the backend and updates the state.
-  void _loadExpenses() {
-    _future = _service.fetchExpenses();
-    setState(() {});
+  Future<void> _loadExpenses() async {
+    final expenses = await _service.fetchExpenses();
+    setState(() {
+      _allExpenses = expenses;
+      _applyCategoryFilter(_selectedCategory);
+    });
   }
 
-  /// Logs out the current user and navigates to the login screen.
+  void _applyCategoryFilter(String category) {
+    _selectedCategory = category;
+    if (category == 'All') {
+      _filteredExpenses = List.from(_allExpenses);
+    } else {
+      _filteredExpenses =
+          _allExpenses.where((e) => e.category == category).toList();
+    }
+  }
+
   void _logout() async {
     await AuthService.logout();
     Navigator.of(context).pushAndRemoveUntil(
@@ -53,16 +80,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Navigates to the change password screen.
   void _changePassword() {
     Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
   }
 
-  /// Formats a [DateTime] object into a human-readable string.
-  ///
-  /// Returns a date in the format 'dd MMM yyyy'.
   String _fmtDate(DateTime d) => DateFormat('dd MMM yyyy').format(d);
 
   @override
@@ -70,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: Column(
         children: [
-          /// Banner at the top with actions for changing password and logout.
+          // original banner with only title + icons
           AppBanner(
             title: 'Your Expenses',
             action: Row(
@@ -89,206 +112,247 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
+
+          // Total + Filter row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+            child: Card(
+              color: Colors.deepPurple.shade50,
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 16),
+                    DropdownButton<String>(
+                      value: _selectedCategory,
+                      items:
+                          _categories
+                              .map(
+                                (c) =>
+                                    DropdownMenuItem(value: c, child: Text(c)),
+                              )
+                              .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _applyCategoryFilter(val);
+                          });
+                        }
+                      },
+                      underline: const SizedBox(),
+                      icon: const Icon(
+                        Icons.filter_list,
+                        color: Colors.deepPurple,
+                      ),
+                      dropdownColor: Colors.white,
+                      style: const TextStyle(color: Colors.black87),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '₹${_totalAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Expense list
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 80),
-              child: Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: FutureBuilder<List<Expense>>(
-                  future: _future,
-                  builder: (context, snap) {
-                    if (snap.connectionState == ConnectionState.waiting) {
-                      // Show loading indicator while fetching data
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snap.hasError) {
-                      // Show error message if fetching fails
-                      return Center(child: Text('Error: ${snap.error}'));
-                    }
-                    final list = snap.data ?? [];
-                    if (list.isEmpty) {
-                      // Show message if there are no expenses
-                      return const Center(child: Text('No expenses to show.'));
-                    }
-                    // List of expenses
-                    return ListView.separated(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: list.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, i) {
-                        final e = list[i];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(
-                            vertical: 6,
-                            horizontal: 2,
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 80),
+              child: FutureBuilder<void>(
+                future: _futureLoad,
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snap.hasError) {
+                    return Center(child: Text('Error: ${snap.error}'));
+                  }
+                  if (_filteredExpenses.isEmpty) {
+                    return const Center(child: Text('No expenses to show.'));
+                  }
+                  return ListView.separated(
+                    padding: const EdgeInsets.all(8),
+                    itemCount: _filteredExpenses.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, i) {
+                      final e = _filteredExpenses[i];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                          vertical: 6,
+                          horizontal: 2,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 2,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Top Row: Name (left), Category (right)
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        e.name,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.deepPurple.withOpacity(
-                                          0.1,
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        e.category,
-                                        style: const TextStyle(
-                                          color: Colors.deepPurple,
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                // Bottom Row: Date (left), Amount (center), Edit/Delete (right)
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _fmtDate(e.date),
-                                        style: TextStyle(
-                                          color: Colors.grey.shade600,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                    Text(
-                                      '₹${e.amount.toStringAsFixed(2)}',
-                                      style: TextStyle(
-                                        color: Colors.green.shade700,
-                                        fontWeight: FontWeight.bold,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      e.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
                                         fontSize: 16,
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
-
-                                    /// Edit expense button
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.edit,
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.deepPurple.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      e.category,
+                                      style: const TextStyle(
                                         color: Colors.deepPurple,
-                                        size: 22,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 12,
                                       ),
-                                      onPressed: () async {
-                                        final updated = await Navigator.of(
-                                          context,
-                                        ).push<bool>(
-                                          MaterialPageRoute(
-                                            builder:
-                                                (_) => AddExpenseScreen(
-                                                  expense: e,
-                                                ),
-                                          ),
-                                        );
-                                        if (updated == true) _loadExpenses();
-                                      },
-                                      tooltip: 'Edit',
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
                                     ),
-
-                                    /// Delete expense button
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.delete,
-                                        color: Colors.redAccent,
-                                        size: 22,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _fmtDate(e.date),
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 12,
                                       ),
-                                      onPressed: () async {
-                                        final ok = await showDialog<bool>(
-                                          context: context,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₹${e.amount.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      color: Colors.green.shade700,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.edit,
+                                      color: Colors.deepPurple,
+                                      size: 22,
+                                    ),
+                                    onPressed: () async {
+                                      final updated = await Navigator.of(
+                                        context,
+                                      ).push<bool>(
+                                        MaterialPageRoute(
                                           builder:
-                                              (_) => AlertDialog(
-                                                title: const Text(
-                                                  'Delete Expense',
-                                                ),
-                                                content: const Text(
-                                                  'Are you sure you want to delete this expense?',
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    child: const Text('Cancel'),
-                                                    onPressed:
-                                                        () => Navigator.pop(
-                                                          context,
-                                                          false,
-                                                        ),
-                                                  ),
-                                                  TextButton(
-                                                    child: const Text('Delete'),
-                                                    onPressed:
-                                                        () => Navigator.pop(
-                                                          context,
-                                                          true,
-                                                        ),
-                                                  ),
-                                                ],
-                                              ),
-                                        );
-                                        if (ok == true) {
-                                          await _service.deleteExpense(e.id);
-                                          _loadExpenses();
-                                        }
-                                      },
-                                      tooltip: 'Delete',
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
+                                              (_) =>
+                                                  AddExpenseScreen(expense: e),
+                                        ),
+                                      );
+                                      if (updated == true) {
+                                        await _loadExpenses();
+                                      }
+                                    },
+                                    tooltip: 'Edit',
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      color: Colors.redAccent,
+                                      size: 22,
                                     ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                                    onPressed: () async {
+                                      final ok = await showDialog<bool>(
+                                        context: context,
+                                        builder:
+                                            (_) => AlertDialog(
+                                              title: const Text(
+                                                'Delete Expense',
+                                              ),
+                                              content: const Text(
+                                                'Are you sure you want to delete this expense?',
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  child: const Text('Cancel'),
+                                                  onPressed:
+                                                      () => Navigator.pop(
+                                                        context,
+                                                        false,
+                                                      ),
+                                                ),
+                                                TextButton(
+                                                  child: const Text('Delete'),
+                                                  onPressed:
+                                                      () => Navigator.pop(
+                                                        context,
+                                                        true,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                      );
+                                      if (ok == true) {
+                                        await _service.deleteExpense(e.id);
+                                        await _loadExpenses();
+                                      }
+                                    },
+                                    tooltip: 'Delete',
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                    );
-                  },
-                ),
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
             ),
           ),
         ],
       ),
-
-      /// Floating action button to add a new expense.
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final added = await Navigator.of(context).push<bool>(
             MaterialPageRoute(builder: (_) => const AddExpenseScreen()),
           );
-          if (added == true) _loadExpenses();
+          if (added == true) {
+            await _loadExpenses();
+          }
         },
         child: const Icon(Icons.add),
       ),
