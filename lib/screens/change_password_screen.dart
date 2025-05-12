@@ -1,8 +1,8 @@
+import 'package:back4app_assignment/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
 import '../services/auth_service.dart';
 import '../widgets/app_banner.dart';
-import 'home_screen.dart';
 
 /// Screen for allowing users to change their account password.
 ///
@@ -74,7 +74,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         const SnackBar(content: Text('Password changed. Please log in again.')),
       );
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
       );
     } else {
@@ -137,11 +137,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             labelText: 'New Password',
                           ),
                           obscureText: true,
-                          validator:
-                              (v) =>
-                                  v != null && v.length >= 6
-                                      ? null
-                                      : 'Min 6 characters',
+                          validator: (v) {
+                            if (v == null || v.length < 6)
+                              return 'Min 6 characters';
+                            if (v == _currentCtrl.text)
+                              return 'New password must differ from current';
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
